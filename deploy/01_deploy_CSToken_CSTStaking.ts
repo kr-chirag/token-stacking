@@ -12,7 +12,7 @@ module.exports = async () => {
 
     // deploying staking contract
     const CSTStakingContract = await ethers.getContractFactory("CSTStaking");
-    const csTStaking = await CSTStakingContract.deploy(cstAdress, deployer);
+    const csTStaking = await CSTStakingContract.deploy(cstAdress, deployer, 30);
     await csTStaking.waitForDeployment();
     console.log("CSTStaking deployed:", await csTStaking.getAddress());
 };
