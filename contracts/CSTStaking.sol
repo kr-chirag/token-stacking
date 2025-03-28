@@ -3,90 +3,84 @@ pragma solidity ^0.8.28;
 
 import {CSToken} from "./CSToken.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {RewardUtils} from "./utils/RewardUtils.sol";
 
 contract CSTStaking {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using RewardUtils for RewardUtils.Reward;
 
     struct Stake {
         uint256 amount;
-        uint256 lastUpdated;
-        uint256 reward;
+        uint256 rewardedAmount;
     }
 
     CSToken private csToken;
-    address public rewardManager;
+    RewardUtils.Reward private reward;
 
-    uint256 public totalStakedTokes;
-    EnumerableSet.AddressSet private stakeHolders;
+    address public rewardManager;
+    uint256 public totalSupply;
+
+    // EnumerableSet.AddressSet private stakeHolders;
     mapping(address stakeHolder => Stake stake) public stakeHolderToStake;
 
-    uint256 public rewardRate; // fixed reward rate per hour
-
-    constructor(CSToken _csToken, address _rewardManager, uint256 _rewardRate) {
+    constructor(CSToken _csToken, address _rewardManager) {
         csToken = _csToken;
         rewardManager = _rewardManager;
-        rewardRate = _rewardRate;
     }
 
-    function _calculateReward(address _account) private view returns (uint256) {
-        uint256 lastUpdated = stakeHolderToStake[_account].lastUpdated;
-        uint256 amount = stakeHolderToStake[_account].amount;
-        return ((block.timestamp - lastUpdated) * amount * rewardRate) / 3600;
-    }
+    /* ========== Private utility functions ========== */
 
     function _updateReward(address _account) private {
-        uint256 reward = _calculateReward(_account);
-        stakeHolderToStake[_account].lastUpdated = block.timestamp;
-        stakeHolderToStake[_account].reward += reward;
+        uint256 rewardedAmount = reward.calculateReward(
+            _account,
+            stakeHolderToStake[_account].amount,
+            totalSupply
+        );
+        stakeHolderToStake[_account].rewardedAmount += rewardedAmount;
     }
 
     function _withdraw(address _account, uint256 _amount) private {
-        // check is stakeholder has enough stakes
-        uint256 userBalance = stakeHolderToStake[_account].amount;
-        require(userBalance >= _amount, "Insufficient balance");
-
-        totalStakedTokes -= _amount;
+        totalSupply -= _amount;
         stakeHolderToStake[_account].amount -= _amount;
-
         csToken.transfer(_account, _amount);
     }
 
     function _claim(address _account) private {
-        uint256 reward = stakeHolderToStake[msg.sender].reward;
-        stakeHolderToStake[msg.sender].reward = 0;
-        csToken.transfer(_account, reward);
+        uint256 rewardedAmount = stakeHolderToStake[msg.sender].rewardedAmount;
+        stakeHolderToStake[msg.sender].rewardedAmount = 0;
+        csToken.transfer(_account, rewardedAmount);
     }
 
-    function stake(uint256 _amount) public {
-        uint256 userBalance = csToken.balanceOf(msg.sender);
-        require(userBalance >= _amount, "Insufficient balance");
+    /* ========== public user interactions ========== */
+
+    function stake(uint256 _amount) public checkTokenBalance(_amount) {
         csToken.transferFrom(msg.sender, address(this), _amount);
-
-        // update reward for already staked tokens
+        // update rewardedAmount for already staked tokens
         _updateReward(msg.sender);
-
         // add new tokens to stakeholder account
         stakeHolderToStake[msg.sender].amount += _amount;
-        totalStakedTokes += _amount;
-        stakeHolders.add(msg.sender);
+        totalSupply += _amount;
     }
 
     function withdraw(uint256 _amount) public {
-        // update reward for already staked tokens before withdraw
+        // check is stakeholder has enough stakes
+        uint256 userBalance = stakeHolderToStake[msg.sender].amount;
+        require(userBalance >= _amount, "Insufficient balance");
+        // update rewardedAmount for already staked tokens before withdraw
         _updateReward(msg.sender);
         // withdraw amount
         _withdraw(msg.sender, _amount);
     }
 
     function claim() public {
-        // update reward for already staked tokens before claim
+        // update rewardedAmount for already staked tokens before claim
         _updateReward(msg.sender);
         // claim the rewards
         _claim(msg.sender);
     }
 
     function exit() public {
-        // update reward for already staked tokens before claim
+        // update rewardedAmount for already staked tokens before claim
         _updateReward(msg.sender);
         // claim the rewards
         _claim(msg.sender);
@@ -96,20 +90,37 @@ contract CSTStaking {
         delete stakeHolderToStake[msg.sender];
     }
 
-    function getRewards() public view returns (uint256) {
-        return
-            stakeHolderToStake[msg.sender].reward +
-            _calculateReward(msg.sender);
+    function getRewards() public returns (uint256) {
+        _updateReward(msg.sender);
+        return stakeHolderToStake[msg.sender].rewardedAmount;
     }
 
-    function setRewardRate(uint256 _rewardRate) public onlyRewardManager {
-        for (uint256 idx = 0; idx < stakeHolders.length(); idx++)
-            _updateReward(stakeHolders.at(idx));
-        rewardRate = _rewardRate;
+    /* ========== public onlyRewardManager interactions ========== */
+
+    function addReward(
+        uint256 _amount,
+        uint256 _duration
+    ) public onlyRewardManager checkTokenBalance(_amount) {
+        require(
+            reward.periodFinish < block.timestamp,
+            "distribution is in process"
+        );
+        reward.amount = _amount;
+        reward.durationToDistribute = _duration;
+        reward.periodFinish = block.timestamp + _duration;
+        reward.rewardPerSecond = _amount / _duration;
+        reward.lastUpdated = block.timestamp;
+        csToken.transferFrom(msg.sender, address(this), _amount);
     }
 
     modifier onlyRewardManager() {
         require(msg.sender == rewardManager, "Access Denied");
+        _;
+    }
+
+    modifier checkTokenBalance(uint256 _amount) {
+        uint256 userBalance = csToken.balanceOf(msg.sender);
+        require(userBalance >= _amount, "Insufficient balance");
         _;
     }
 }
