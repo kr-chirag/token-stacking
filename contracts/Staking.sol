@@ -3,10 +3,10 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {RewardUtils} from "./utils/RewardUtils.sol";
+import "./libs/RewardStruct.sol";
 
-contract CSTStaking {
-    using RewardUtils for RewardUtils.Reward;
+contract Staking {
+    using RewardStruct for RewardStruct.Reward;
 
     struct Stake {
         uint256 amount;
@@ -14,7 +14,7 @@ contract CSTStaking {
     }
 
     IERC20 private token;
-    RewardUtils.Reward public reward;
+    RewardStruct.Reward public reward;
 
     address public rewardManager;
     uint256 public totalSupply;

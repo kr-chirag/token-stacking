@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
 pragma solidity ^0.8.28;
 
-library RewardUtils {
+library RewardStruct {
     struct Reward {
         uint256 periodFinish; // addedAt + durationToDistribute;
         uint256 rewardPerSecond; // reward to distribute per second = amount / durationToDistribute
