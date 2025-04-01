@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
 pragma solidity ^0.8.28;
 
-import {CSToken} from "./CSToken.sol";
+import {CSToken} from "./Token.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {RewardUtils} from "./utils/RewardUtils.sol";
 
 contract CSTStaking {
+
     using EnumerableSet for EnumerableSet.AddressSet;
     using RewardUtils for RewardUtils.Reward;
 
@@ -15,7 +16,7 @@ contract CSTStaking {
     }
 
     CSToken private csToken;
-    RewardUtils.Reward private reward;
+    RewardUtils.Reward public reward;
 
     address public rewardManager;
     uint256 public totalSupply;
@@ -23,20 +24,17 @@ contract CSTStaking {
     // EnumerableSet.AddressSet private stakeHolders;
     mapping(address stakeHolder => Stake stake) public stakeHolderToStake;
 
-    constructor(CSToken _csToken, address _rewardManager) {
-        csToken = _csToken;
-        rewardManager = _rewardManager;
-    }
+    // constructor(CSToken _csToken, address _rewardManager) {
+    //     csToken = _csToken;
+    //     rewardManager = _rewardManager;
+    // }
 
     /* ========== Private utility functions ========== */
 
     function _updateReward(address _account) private {
-        uint256 rewardedAmount = reward.calculateReward(
-            _account,
-            stakeHolderToStake[_account].amount,
-            totalSupply
-        );
+        uint256 rewardedAmount = reward.calculateReward(_account, stakeHolderToStake[_account].amount, totalSupply);
         stakeHolderToStake[_account].rewardedAmount += rewardedAmount;
+        reward.updateRewardDetails(totalSupply);
     }
 
     function _withdraw(address _account, uint256 _amount) private {
@@ -54,12 +52,12 @@ contract CSTStaking {
     /* ========== public user interactions ========== */
 
     function stake(uint256 _amount) public checkTokenBalance(_amount) {
-        csToken.transferFrom(msg.sender, address(this), _amount);
+        // csToken.transferFrom(msg.sender, address(this), _amount);
         // update rewardedAmount for already staked tokens
-        _updateReward(msg.sender);
         // add new tokens to stakeholder account
         stakeHolderToStake[msg.sender].amount += _amount;
         totalSupply += _amount;
+        _updateReward(msg.sender);
     }
 
     function withdraw(uint256 _amount) public {
@@ -90,9 +88,8 @@ contract CSTStaking {
         delete stakeHolderToStake[msg.sender];
     }
 
-    function getRewards() public returns (uint256) {
-        _updateReward(msg.sender);
-        return stakeHolderToStake[msg.sender].rewardedAmount;
+    function getRewards() public view returns (uint256) {
+        return reward.calculateReward(msg.sender, stakeHolderToStake[msg.sender].amount, totalSupply);
     }
 
     /* ========== public onlyRewardManager interactions ========== */
@@ -110,17 +107,17 @@ contract CSTStaking {
         reward.periodFinish = block.timestamp + _duration;
         reward.rewardPerSecond = _amount / _duration;
         reward.lastUpdated = block.timestamp;
-        csToken.transferFrom(msg.sender, address(this), _amount);
+        // csToken.transferFrom(msg.sender, address(this), _amount);
     }
 
     modifier onlyRewardManager() {
-        require(msg.sender == rewardManager, "Access Denied");
+        // require(msg.sender == rewardManager, "Access Denied");
         _;
     }
 
     modifier checkTokenBalance(uint256 _amount) {
-        uint256 userBalance = csToken.balanceOf(msg.sender);
-        require(userBalance >= _amount, "Insufficient balance");
+        // uint256 userBalance = csToken.balanceOf(msg.sender);
+        // require(userBalance >= _amount, "Insufficient balance");
         _;
     }
 }
