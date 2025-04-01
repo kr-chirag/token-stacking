@@ -2,10 +2,7 @@
 pragma solidity ^0.8.28;
 
 library RewardUtils {
-
     struct Reward {
-        uint256 amount; // amount to distribute for the entire duration
-        uint256 durationToDistribute; // duration in which the amount should be distributed
         uint256 periodFinish; // addedAt + durationToDistribute;
         uint256 rewardPerSecond; // reward to distribute per second = amount / durationToDistribute
         uint256 lastUpdated; // last time when rewardPerTokenAccumulated updated
@@ -17,15 +14,10 @@ library RewardUtils {
         min = (n1 > n2) ? n2 : n1;
     }
 
-    function _duration(
-        Reward storage reward
-    ) private view returns (uint256) {
-        if (block.timestamp > reward.periodFinish) {
-            if (reward.periodFinish < reward.lastUpdated) return 0;
-            return reward.periodFinish - reward.lastUpdated;
-        } else {
-            return block.timestamp - reward.lastUpdated;
-        }
+    function _duration(Reward storage reward) private view returns (uint256) {
+        uint256 applibaleUptoTime = _min(block.timestamp, reward.periodFinish);
+        if (applibaleUptoTime < reward.lastUpdated) return 0;
+        return applibaleUptoTime - reward.lastUpdated;
     }
 
     function _rewardPerTokenAccumulated(
@@ -33,20 +25,34 @@ library RewardUtils {
         uint256 _totalSupply
     ) private view returns (uint256) {
         if (_totalSupply == 0) return 0;
-        return reward.rewardPerTokenAccumulated + (reward.rewardPerSecond *
-            _duration(reward) * 1e18 ) / _totalSupply;
+        return
+            reward.rewardPerTokenAccumulated +
+            (reward.rewardPerSecond * _duration(reward) * 1e18) /
+            _totalSupply;
     }
 
-    function calculateReward(Reward storage reward, address _account, uint256 _stake, uint256 _totalSupply) internal view returns(uint256){
-        uint256 applicable = _rewardPerTokenAccumulated(reward, _totalSupply) - reward.lastRewardPerTokenAccumulated[_account];
-        return applicable * _stake / 1e18 ;
-        
+    function calculateReward(
+        Reward storage reward,
+        address _account,
+        uint256 _stake,
+        uint256 _totalSupply
+    ) internal view returns (uint256) {
+        uint256 applicable = _rewardPerTokenAccumulated(reward, _totalSupply) -
+            reward.lastRewardPerTokenAccumulated[_account];
+        return (applicable * _stake) / 1e18;
     }
 
-    function updateRewardDetails(Reward storage reward, address _account, uint256 _totalSupply) internal {
-        reward.rewardPerTokenAccumulated = _rewardPerTokenAccumulated(reward, _totalSupply);
-        reward.lastRewardPerTokenAccumulated[_account] = reward.rewardPerTokenAccumulated;
+    function updateRewardDetails(
+        Reward storage reward,
+        address _account,
+        uint256 _totalSupply
+    ) internal {
+        reward.rewardPerTokenAccumulated = _rewardPerTokenAccumulated(
+            reward,
+            _totalSupply
+        );
+        reward.lastRewardPerTokenAccumulated[_account] = reward
+            .rewardPerTokenAccumulated;
         reward.lastUpdated = block.timestamp;
     }
-
 }
