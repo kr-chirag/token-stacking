@@ -43,8 +43,9 @@ library RewardUtils {
         
     }
 
-    function updateRewardDetails(Reward storage reward, uint256 _totalSupply) internal {
+    function updateRewardDetails(Reward storage reward, address _account, uint256 _totalSupply) internal {
         reward.rewardPerTokenAccumulated = _rewardPerTokenAccumulated(reward, _totalSupply);
+        reward.lastRewardPerTokenAccumulated[_account] = reward.rewardPerTokenAccumulated;
         reward.lastUpdated = block.timestamp;
     }
 
