@@ -34,7 +34,7 @@ contract CSTStaking {
     function _updateReward(address _account) private {
         uint256 rewardedAmount = reward.calculateReward(_account, stakeHolderToStake[_account].amount, totalSupply);
         stakeHolderToStake[_account].rewardedAmount += rewardedAmount;
-        reward.updateRewardDetails(totalSupply);
+        reward.updateRewardDetails(_account, totalSupply);
     }
 
     function _withdraw(address _account, uint256 _amount) private {
